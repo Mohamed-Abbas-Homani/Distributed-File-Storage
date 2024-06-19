@@ -2,9 +2,24 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"testing"
 )
+
+func newStore() *Store {
+	opts := StoreOtps{
+		PathTransformFunc: CASPathTransformFunc,
+	}
+
+	return NewStore(opts)
+}
+
+func teardown(t *testing.T, s *Store) {
+	if err := s.Clear(); err != nil {
+		t.Error(err)
+	}
+}
 
 func TestPathTransformFunc(t *testing.T) {
 	key := "Mash"
@@ -20,50 +35,40 @@ func TestPathTransformFunc(t *testing.T) {
 }
 
 func TestStore(t *testing.T) {
-	opts := StoreOtps{
-		PathTransformFunc: CASPathTransformFunc,
-	}
-	s := NewStore(opts)
+	s := newStore()
+	defer teardown(t, s)
 	data := []byte("some jpeg bytes")
-	key := "myspecialimage"
-	if err := s.writeStream(key, bytes.NewReader(data)); err != nil {
-		t.Error(err)
+	for i := 0; i < 50; i++ {
+
+		key := fmt.Sprintf("Test_%d", i)
+		if _, err := s.writeStream(key, bytes.NewReader(data)); err != nil {
+			t.Error(err)
+		}
+
+		if ok := s.Has(key); !ok {
+			t.Errorf("expected to have key %s", key)
+		}
+
+		r, err := s.Read(key)
+		if err != nil {
+			t.Error(err)
+		}
+
+		b, err := io.ReadAll(r)
+		if err != nil {
+			t.Error(err)
+		}
+
+		if string(b) != string(data) {
+			t.Errorf("want %s have %s", data, b)
+		}
+
+		if err := s.Delete(key); err != nil {
+			t.Error(err)
+		}
+
+		if ok := s.Has(key); ok {
+			t.Errorf("expected to NOT have key %s", key)
+		}
 	}
-
-    if ok := s.Has(key); !ok {
-        t.Errorf("expected to have key %s", key)
-    }
-
-	r, err := s.Read(key)
-	if err != nil {
-		t.Error(err)
-	}
-
-	b, err := io.ReadAll(r)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if string(b) != string(data) {
-		t.Errorf("want %s have %s", data, b)
-	}
-
-    s.Delete(key)
-
-}
-
-func TestStoreDeleteKey ( t *testing.T) {
-	opts := StoreOtps{
-		PathTransformFunc: CASPathTransformFunc,
-	}
-    s := NewStore(opts)
-	data := []byte("some jpeg bytes")
-	key := "myspecialimage"
-	if err := s.writeStream(key, bytes.NewReader(data)); err != nil {
-		t.Error(err)
-	}
-
-    if err := s.Delete(key); err != nil {
-        t.Error(err)
-    }
 }

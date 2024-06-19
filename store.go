@@ -85,6 +85,14 @@ func NewStore(opts StoreOtps) *Store {
 	}
 }
 
+func (s *Store) Clear() error {
+
+	defer func() {
+		log.Printf("All deleted\n")
+	}()
+	return os.RemoveAll(s.Root)
+}
+
 func (s *Store) Has(key string) bool {
 	pathkey := s.PathTransformFunc(key)
     fullPath := fmt.Sprintf("%s/%s", s.Root, pathkey.FullPath())
@@ -121,24 +129,27 @@ func (s *Store) readStream(key string) (io.ReadCloser, error) {
 	return os.Open(fullPath)
 }
 
-func (s *Store) writeStream(key string, r io.Reader) error {
+func (s *Store) Write (key string, r io.Reader) (int64, error) {
+    return s.writeStream(key, r)
+}
+
+func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
 	pathkey := s.PathTransformFunc(key)
 	pathNameWithRoot := fmt.Sprintf("%s/%s", s.Root, pathkey.Pathname)
 	if err := os.MkdirAll(pathNameWithRoot, os.ModePerm); err != nil {
-		return err
+		return 0, err
 	}
 
 	fullPath := fmt.Sprintf("%s/%s", s.Root, pathkey.FullPath())
 	f, err := os.Create(fullPath)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	n, err := io.Copy(f, r)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	log.Printf("written (%d) bytes to disk: %s\n", n, fullPath)
-	return nil
+	return n, nil
 }
