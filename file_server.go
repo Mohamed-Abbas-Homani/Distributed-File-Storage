@@ -112,6 +112,7 @@ func (s *FileServer) broadcast(msg *Message) error {
 	}
 
 	for _, peer := range s.peers {
+		peer.Send([]byte{p2p.IncomingMessage})
 		if err := peer.Send(buf.Bytes()); err != nil {
 			return err
 		}
@@ -144,6 +145,7 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 	time.Sleep(3 * time.Second)
 
 	for _, peer := range s.peers {
+		peer.Send([]byte{p2p.IncomingStream})
 		n, err := io.Copy(peer, fileBuf)
 		if err != nil {
 			return err
@@ -171,6 +173,18 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 		return nil, err
 	}
 
+	time.Sleep(500 * time.Millisecond)
+	for _, peer := range s.peers {
+		fileBuffer := new(bytes.Buffer)
+		n, err := io.Copy(fileBuffer, peer)
+		if err != nil {
+			return nil, err
+		}
+		log.Printf("received (%d) bytes over the network\n", n)
+		log.Println(fileBuffer.String())
+	}
+
+	select {}
 	return nil, nil
 }
 func (s *FileServer) handleMessage(from string, msg *Message) error {
@@ -194,9 +208,9 @@ func (s *FileServer) handleMessageStoreFile(from string, msg MessageStoreFile) e
 		return err
 	}
 
-	log.Printf("written (%d) bytes to disk\n", n)
+	log.Printf("[%s] written (%d) bytes to disk\n", s.Transport.Addr(), n)
 
-	peer.(*p2p.TCPPeer).Wg.Done()
+	peer.CloseStream()
 
 	return nil
 }
@@ -206,23 +220,24 @@ func (s *FileServer) handleMessageGetFile(from string, msg MessageGetFile) error
 		return fmt.Errorf("need to serve file (%s) but it does not exist on disk", msg.Key)
 	}
 
-    r, err := s.store.Read(msg.Key)
-    if err != nil {
-        return err
-    }
+	log.Printf("serving file (%s) over the network", msg.Key)
+	r, err := s.store.Read(msg.Key)
+	if err != nil {
+		return err
+	}
 
-    peer, ok := s.peers[from]
-    if !ok {
-        return fmt.Errorf("peer is not in map")
-    }
+	peer, ok := s.peers[from]
+	if !ok {
+		return fmt.Errorf("peer is not in map")
+	}
 
-    n, err := io.Copy(peer, r)
-    if err != nil {
-        return err
-    }
+	n, err := io.Copy(peer, r)
+	if err != nil {
+		return err
+	}
 
-    log.Printf("written (%d) bytes over the network to %s\n", n, from)
-    return nil
+	log.Printf("written (%d) bytes over the network to %s\n", n, from)
+	return nil
 }
 
 func (s *FileServer) loop() {
