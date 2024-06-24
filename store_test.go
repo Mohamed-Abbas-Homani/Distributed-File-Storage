@@ -8,7 +8,7 @@ import (
 )
 
 func newStore() *Store {
-	opts := StoreOtps{
+	opts := StoreOpts{
 		PathTransformFunc: CASPathTransformFunc,
 	}
 
@@ -25,12 +25,12 @@ func TestPathTransformFunc(t *testing.T) {
 	key := "Mash"
 	expectedFilename := "453f2e740bd7f436e5622609bed9db9edc000bf7"
 	expectedPathName := "453f2/e740b/d7f43/6e562/2609b/ed9db/9edc0/00bf7"
-	pathkey := CASPathTransformFunc(key)
-	if pathkey.Pathname != expectedPathName {
-		t.Errorf("have %s want %s", pathkey.Pathname, expectedPathName)
+	pathKey := CASPathTransformFunc(key)
+	if pathKey.Pathname != expectedPathName {
+		t.Errorf("have %s want %s", pathKey.Pathname, expectedPathName)
 	}
-	if pathkey.Filename != expectedFilename {
-		t.Errorf("have %s want %s", pathkey.Filename, expectedFilename)
+	if pathKey.Filename != expectedFilename {
+		t.Errorf("have %s want %s", pathKey.Filename, expectedFilename)
 	}
 }
 

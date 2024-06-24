@@ -40,15 +40,23 @@ func main() {
 	}()
 
 	time.Sleep(2 * time.Second)
-	go s2.Start()
+	go func() {
+		err := s2.Start()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
 	time.Sleep(2 * time.Second)
 
 	for i := 0; i < 10; i++ {
 		data := bytes.NewReader([]byte("my file"))
-		s2.Store(fmt.Sprintf("mydata_%d", i), data)
+		err := s2.Store(fmt.Sprintf("mydata_%d", i), data)
+		if err != nil {
+			return
+		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	// r, err := s2.Get("mydata")
+	// r, err := s2.Get("my data")
 	// if err != nil {
 	// 	log.Fatal(err)
 	// }

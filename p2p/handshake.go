@@ -1,6 +1,6 @@
 package p2p
 
-// HandshakeFunk... ?
+// HandshakeFunk ...
 type HandshakeFunk func(any) error
 
-func NOPHandshakeFunc(any) error {return nil}
+func NOPHandshakeFunc(any) error { return nil }

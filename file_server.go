@@ -27,25 +27,25 @@ type FileServer struct {
 	peerLock sync.Mutex
 	peers    map[string]p2p.Peer
 
-	store  *Store
-	quitch chan struct{}
+	store    *Store
+	quitChan chan struct{}
 }
 
 func NewFileServer(opts FileServerOpts) *FileServer {
-	storeOpts := StoreOtps{
+	storeOpts := StoreOpts{
 		Root:              opts.StorageRoot,
 		PathTransformFunc: opts.PathTransformFunc,
 	}
 	return &FileServer{
 		FileServerOpts: opts,
 		store:          NewStore(storeOpts),
-		quitch:         make(chan struct{}),
+		quitChan:       make(chan struct{}),
 		peers:          make(map[string]p2p.Peer),
 	}
 }
 
 func (s *FileServer) Stop() {
-	close(s.quitch)
+	close(s.quitChan)
 }
 
 func (s *FileServer) OnPeer(p p2p.Peer) error {
@@ -76,7 +76,10 @@ func (s *FileServer) Start() error {
 	if err := s.Transport.ListenAndAccept(); err != nil {
 		return err
 	}
-	s.bootstrapNetwork()
+	err := s.bootstrapNetwork()
+	if err != nil {
+		return err
+	}
 
 	s.loop()
 	return nil
@@ -96,7 +99,7 @@ type MessageGetFile struct {
 }
 
 func (s *FileServer) stream(msg *Message) error {
-	peers := []io.Writer{}
+	var peers []io.Writer
 	for _, peer := range s.peers {
 		peers = append(peers, peer)
 	}
@@ -112,7 +115,10 @@ func (s *FileServer) broadcast(msg *Message) error {
 	}
 
 	for _, peer := range s.peers {
-		peer.Send([]byte{p2p.IncomingMessage})
+		err := peer.Send([]byte{p2p.IncomingMessage})
+		if err != nil {
+			return err
+		}
 		if err := peer.Send(buf.Bytes()); err != nil {
 			return err
 		}
@@ -145,7 +151,10 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 	time.Sleep(3 * time.Second)
 
 	for _, peer := range s.peers {
-		peer.Send([]byte{p2p.IncomingStream})
+		err := peer.Send([]byte{p2p.IncomingStream})
+		if err != nil {
+			return err
+		}
 		n, err := io.Copy(peer, fileBuf)
 		if err != nil {
 			return err
@@ -243,7 +252,10 @@ func (s *FileServer) handleMessageGetFile(from string, msg MessageGetFile) error
 func (s *FileServer) loop() {
 	defer func() {
 		log.Println("File Server stopped due to error or user action!")
-		s.Transport.Close()
+		err := s.Transport.Close()
+		if err != nil {
+			return
+		}
 	}()
 	for {
 		select {
@@ -258,7 +270,7 @@ func (s *FileServer) loop() {
 				log.Println("handle Message error:", err)
 			}
 
-		case <-s.quitch:
+		case <-s.quitChan:
 			return
 		}
 	}

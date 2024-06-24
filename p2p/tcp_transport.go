@@ -49,20 +49,20 @@ type TCPTransportOpts struct {
 type TCPTransport struct {
 	TCPTransportOpts
 	listener net.Listener
-	rpcch    chan RPC
+	rpcChan  chan RPC
 }
 
 // NewTCPTransport creates a new TCPTransport.
 func NewTCPTransport(opts TCPTransportOpts) *TCPTransport {
 	return &TCPTransport{
 		TCPTransportOpts: opts,
-		rpcch:            make(chan RPC, 1024),
+		rpcChan:          make(chan RPC, 1024),
 	}
 }
 
 // Consume returns a read-only channel for reading incoming messages from peers.
 func (t *TCPTransport) Consume() <-chan RPC {
-	return t.rpcch
+	return t.rpcChan
 }
 
 // ListenAndAccept starts listening for and accepting incoming connections.
@@ -115,7 +115,10 @@ func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 	var err error
 	defer func() {
 		fmt.Printf("dropping peer connection: %s\n", err)
-		conn.Close()
+		err := conn.Close()
+		if err != nil {
+			return
+		}
 	}()
 	peer := NewTCPPeer(conn, outbound)
 
@@ -147,7 +150,7 @@ func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 			log.Printf("[%s] stream closed, resuming read loop...\n", conn.RemoteAddr())
 			continue
 		}
-		t.rpcch <- rpc
+		t.rpcChan <- rpc
 	}
 }
 
